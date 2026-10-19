@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Archive, Brain, Search } from 'lucide-react';
-import type { Backend } from '../lib/backend';
+import { splitMatches, type Backend } from '../lib/backend';
 import type { RecallResult } from '../lib/types';
 import { SAMPLE_SYMPTOMS } from '../data/seed';
 import { useSpeech } from '../lib/useSpeech';
@@ -14,7 +14,13 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
   const [res, setRes] = useState<RecallResult | null>(null);
   const [filed, setFiled] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const speech = useSpeech((t) => setQ((p) => (p ? p.trimEnd() + ' ' : '') + t));
+  useEffect(() => {
+    const on = () => speech.toggle();
+    addEventListener('dejavu:toggle-mic', on);
+    return () => removeEventListener('dejavu:toggle-mic', on);
+  }, [speech]);
   const [engine, setEng] = useState<Engine>(getEngine());
   const [modelState, setModelState] = useState<string | null>(null);
 
@@ -40,6 +46,7 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
     setBusy(true);
     setErr(null);
     setFiled(false);
+    setShowAll(false);
     try {
       const r = await backend.recall(query);
       setRes(r);
@@ -64,8 +71,8 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
       <section className="panel p-6">
         <h2 className="text-lg font-semibold text-white">Have I seen this before?</h2>
         <p className="mt-1 text-sm text-slate-400">Describe the symptom — speak it or type it. Déjà Vu searches every past session by meaning, not keywords.</p>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="relative flex-1">
+        <div className="mt-4 flex flex-wrap items-center gap-3 sm:flex-nowrap">
+          <div className="relative w-full flex-1 sm:w-auto">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               data-testid="recall-input"
@@ -109,6 +116,18 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
         {err && <p className="mt-3 text-sm text-red-300">{err}</p>}
       </section>
 
+      {!res && !busy && (
+        <section className="panel grid place-items-center px-6 py-14 text-center" data-testid="recall-empty">
+          <div className="relative mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-ink-600 bg-ink-850">
+            <Brain className="h-6 w-6 text-accent" />
+            <span className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-accent/50" />
+          </div>
+          <h3 className="font-medium text-white">Ask your past self</h3>
+          <p className="mt-1 max-w-md text-sm text-slate-400">Describe what you're seeing right now — “pods crashlooping after helm upgrade”, “emails sent an hour early”… Déjà Vu searches every session you've ever captured.</p>
+          <p className="mt-4 font-mono text-[11px] text-slate-600">press <span className="text-slate-400">/</span> to type · <span className="text-slate-400">Alt+M</span> to speak · hold <span className="text-slate-400">fn</span> for Wispr</p>
+        </section>
+      )}
+
       {res && (
         <section className="animate-fadeUp space-y-4" data-testid="recall-result" data-matched={res.matched}>
           {res.matched ? (
@@ -146,7 +165,10 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
             </div>
           )}
 
-          {res.matches.map((m, i) => (
+          {(() => {
+            const { shown, hidden } = splitMatches(res.matches);
+            return [...shown, ...(showAll ? hidden : [])];
+          })().map((m, i) => (
             <article key={m.session.id} className="panel p-5" data-testid="match-card">
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <span className="font-mono text-xs text-slate-500">#{i + 1}</span>
@@ -172,6 +194,14 @@ export function Recall({ backend, onChange, showSamples }: { backend: Backend; o
               </div>
             </article>
           ))}
+          {(() => {
+            const { hidden } = splitMatches(res.matches);
+            return hidden.length > 0 ? (
+              <button className="chip mx-auto" data-testid="toggle-weaker" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? 'hide weaker matches' : `+${hidden.length} weaker match${hidden.length > 1 ? 'es' : ''} (more than 5 pts below the top)`}
+              </button>
+            ) : null;
+          })()}
         </section>
       )}
     </div>

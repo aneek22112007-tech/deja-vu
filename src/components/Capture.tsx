@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Sparkles, Wand2 } from 'lucide-react';
 import type { Backend } from '../lib/backend';
 import type { CaptureResult } from '../lib/types';
@@ -18,6 +18,11 @@ export function Capture({ backend, onSaved }: { backend: Backend; onSaved: () =>
   const [err, setErr] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const speech = useSpeech((t) => setText((prev) => (prev ? prev.trimEnd() + ' ' : '') + t));
+  useEffect(() => {
+    const on = () => speech.toggle();
+    addEventListener('dejavu:toggle-mic', on);
+    return () => removeEventListener('dejavu:toggle-mic', on);
+  }, [speech]);
 
   const save = async () => {
     if (!text.trim()) return;

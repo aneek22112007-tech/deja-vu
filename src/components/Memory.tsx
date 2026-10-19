@@ -40,7 +40,7 @@ function Editor({ s, onSave, onCancel }: { s: Session; onSave: (p: Partial<Sessi
   );
 }
 
-export function Memory({ backend, sessions, reload }: { backend: Backend; sessions: Session[]; reload: () => void }) {
+export function Memory({ backend, sessions, reload, onCapture }: { backend: Backend; sessions: Session[]; reload: () => void; onCapture?: () => void }) {
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export function Memory({ backend, sessions, reload }: { backend: Backend; sessio
             </button>
           ))}
         </div>
-        {backend.reset && (
+        {backend.kind === 'local' && backend.reset && (
           <button className="btn-ghost ml-auto text-xs" onClick={() => confirm('Reset local memory to the sample data?') && act(() => backend.reset!())}>
             <RotateCcw className="h-3.5 w-3.5" /> reset demo data
           </button>
@@ -118,7 +118,20 @@ export function Memory({ backend, sessions, reload }: { backend: Backend; sessio
             </li>
           );
         })}
-        {!list.length && <li className="text-sm text-slate-500">Nothing here yet.</li>}
+        {!list.length && (
+          <li className="panel -ml-6 grid place-items-center px-6 py-14 text-center" data-testid="memory-empty">
+            <div className="mb-3 text-3xl">{sessions.length ? '🔍' : '🧠'}</div>
+            <h3 className="font-medium text-white">{sessions.length ? 'Nothing matches that filter' : 'Your memory is empty'}</h3>
+            <p className="mt-1 max-w-sm text-sm text-slate-400">
+              {sessions.length ? 'Try another word, or switch the status filter.' : 'Capture your first debugging session — hold your Wispr key and say what broke, what you tried and what fixed it.'}
+            </p>
+            {sessions.length ? (
+              <button className="btn-ghost mt-4" onClick={() => { setQ(''); setFilter('all'); }}>Clear filters</button>
+            ) : (
+              onCapture && <button className="btn-primary mt-4" onClick={onCapture}>Capture a session</button>
+            )}
+          </li>
+        )}
       </ol>
     </div>
   );
