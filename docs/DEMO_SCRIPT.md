@@ -14,5 +14,5 @@
 
 **Tips**
 - Do one dry run; keep total under 1:55 to be safe.
-- If using the Supabase build, the badge shows `● supabase + groq` and results say `explained by groq` — show that for 1 second.
+- If using the Supabase build, the badge shows `● Live: Supabase + Groq` and results say `explained by groq` — show that for 1 second.
 - If anything is slow, cut during edit; don't narrate the wait.
