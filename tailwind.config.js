@@ -17,8 +17,10 @@ export default {
       keyframes: {
         pulseRing: { '0%': { transform: 'scale(1)', opacity: '0.6' }, '100%': { transform: 'scale(1.8)', opacity: '0' } },
         fadeUp: { '0%': { opacity: '0', transform: 'translateY(6px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        scan: { '0%': { top: '-20%' }, '100%': { top: '110%' } },
+        shimmer: { '0%': { backgroundPosition: '0% 50%' }, '100%': { backgroundPosition: '200% 50%' } },
       },
-      animation: { pulseRing: 'pulseRing 1.4s ease-out infinite', fadeUp: 'fadeUp .35s ease-out both' },
+      animation: { pulseRing: 'pulseRing 1.4s ease-out infinite', fadeUp: 'fadeUp .35s ease-out both', scan: 'scan 2.4s ease-in-out infinite', shimmer: 'shimmer 6s linear infinite' },
     },
   },
   plugins: [],
