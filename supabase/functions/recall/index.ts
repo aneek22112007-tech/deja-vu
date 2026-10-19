@@ -67,6 +67,12 @@ Deno.serve(async (req) => {
       }),
     );
 
+    // Strict LLM gate: vectors passed the threshold, but Groq judged none of them to be the same problem
+    // (e.g. a different bug in the same tech area). Treat as a graceful no-match instead of a wrong recall.
+    if (llm && Number(llm.hit_count) === 0) {
+      return json({ query, matches: [], matched: false, confidence: 'none', hitCount: 0, threshold, explainedBy: 'groq', engine: ENGINE, explanation: NO_MATCH, nearestSimilarity: top.similarity });
+    }
+
     // Deterministic fallback: count close neighbours of the top hit.
     const fallbackHits = rows.filter((r) => r.similarity >= Math.max(threshold, top.similarity - 0.06)).length;
     const hitCount = llm && Number.isFinite(llm.hit_count) ? Math.max(1, Math.min(rows.length, Math.round(llm.hit_count))) : fallbackHits;

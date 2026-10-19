@@ -1,5 +1,5 @@
 // Groq (OpenAI-compatible) JSON-mode helper. Free tier is plenty for a personal tool.
-export const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+export const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'openai/gpt-oss-120b';
 
 export async function groqJSON<T>(system: string, user: string): Promise<T | null> {
   const key = Deno.env.get('GROQ_API_KEY');

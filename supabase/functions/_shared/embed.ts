@@ -33,4 +33,4 @@ export const sessionEmbeddingText = (s: { symptom: string; root_cause?: string; 
   [s.symptom, s.symptom, s.root_cause ?? '', (s.tags ?? []).join(' ')].join(' . ');
 
 /** gte-small similarities are compressed into the high range, so its threshold is higher. Override with MATCH_THRESHOLD. */
-export const DEFAULT_THRESHOLD = Number(Deno.env.get('MATCH_THRESHOLD') ?? (EMBEDDING_PROVIDER === 'openai' ? 0.45 : 0.82));
+export const DEFAULT_THRESHOLD = Number(Deno.env.get('MATCH_THRESHOLD') ?? (EMBEDDING_PROVIDER === 'openai' ? 0.45 : 0.81));
