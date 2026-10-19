@@ -1,0 +1,10 @@
+# Minimal Supabase CLI config. Run `supabase init` if you want the full local-dev config.
+project_id = "deja-vu"
+
+# The static frontend calls these with the project's anon/publishable key.
+# verify_jwt=false keeps it working with both legacy anon JWTs and new publishable keys.
+[functions.capture]
+verify_jwt = false
+
+[functions.recall]
+verify_jwt = false
