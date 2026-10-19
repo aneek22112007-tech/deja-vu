@@ -132,21 +132,28 @@ export function createLocalBackend(storage?: KV): Backend {
 
 /* ───────────────────────── Supabase ───────────────────────── */
 
-export function createSupabaseBackend(url: string, anonKey: string): Backend {
+export class HttpError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+  }
+}
+
+export function createSupabaseBackend(url: string, anonKey: string, timeoutMs = 25000): Backend {
   const base = url.replace(/\/$/, '');
   const headers = { apikey: anonKey, Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' };
+  const signal = () => (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(timeoutMs) : undefined);
   const fn = async <T>(name: string, body: unknown): Promise<T> => {
-    const r = await fetch(`${base}/functions/v1/${name}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    const r = await fetch(`${base}/functions/v1/${name}`, { method: 'POST', headers, body: JSON.stringify(body), signal: signal() });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || `${name} failed (${r.status})`);
+    if (!r.ok) throw new HttpError(j.error || `${name} failed (${r.status})`, r.status);
     return j as T;
   };
   const cols = 'id,raw_transcript_redacted,symptom,hypotheses_tried,root_cause,fix,tags,status,created_at,updated_at,sample';
   return {
     kind: 'supabase',
     async list() {
-      const r = await fetch(`${base}/rest/v1/sessions?select=${cols}&order=created_at.desc`, { headers });
-      if (!r.ok) throw new Error(`list failed (${r.status})`);
+      const r = await fetch(`${base}/rest/v1/sessions?select=${cols}&order=created_at.desc`, { headers, signal: signal() });
+      if (!r.ok) throw new HttpError(`list failed (${r.status})`, r.status);
       return (await r.json()) as Session[];
     },
     capture: (transcript, opts) => fn<CaptureResult>('capture', { transcript, status: opts?.status }),
@@ -154,16 +161,103 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     // Edits go through the capture function so the row is re-redacted and re-embedded server-side.
     update: async (id, patch) => (await fn<{ session: Session }>('capture', { id, patch })).session,
     async remove(id) {
-      const r = await fetch(`${base}/rest/v1/sessions?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers });
-      if (!r.ok) throw new Error(`delete failed (${r.status})`);
+      const r = await fetch(`${base}/rest/v1/sessions?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers, signal: signal() });
+      if (!r.ok) throw new HttpError(`delete failed (${r.status})`, r.status);
     },
   };
 }
 
-export function getBackend(): Backend {
+/* ───────────── Auto: live Supabase when reachable, in-browser demo otherwise ───────────── */
+
+export type Mode = 'connecting' | 'live' | 'demo' | 'fallback';
+export interface AutoBackend extends Backend {
+  readonly mode: Mode;
+  ready: Promise<Mode>;
+  subscribe(fn: (m: Mode) => void): () => void;
+}
+
+/** Network failure, timeout or 5xx => the backend is "unreachable" and we fall back to demo mode. */
+export const isUnreachable = (e: unknown) =>
+  e instanceof TypeError || (e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError')) || (e instanceof HttpError && (e.status >= 500 || e.status === 0));
+
+export function createAutoBackend(opts: { url?: string; anonKey?: string; forceDemo?: boolean; storage?: Parameters<typeof createLocalBackend>[0]; probeTimeoutMs?: number } = {}): AutoBackend {
+  const local = createLocalBackend(opts.storage);
+  const listeners = new Set<(m: Mode) => void>();
+  let mode: Mode = opts.url && opts.anonKey && !opts.forceDemo ? 'connecting' : 'demo';
+  const set = (m: Mode) => {
+    if (m === mode) return;
+    mode = m;
+    listeners.forEach((f) => f(m));
+  };
+  const remote = mode === 'connecting' ? createSupabaseBackend(opts.url!, opts.anonKey!) : null;
+
+  const ready: Promise<Mode> = remote
+    ? (async () => {
+        try {
+          const base = opts.url!.replace(/\/$/, '');
+          const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const t = setTimeout(() => ctl?.abort(), opts.probeTimeoutMs ?? 6000);
+          const r = await fetch(`${base}/rest/v1/sessions?select=id&limit=1`, {
+            headers: { apikey: opts.anonKey!, Authorization: `Bearer ${opts.anonKey}` },
+            signal: ctl?.signal,
+          });
+          clearTimeout(t);
+          set(r.ok ? 'live' : 'fallback');
+        } catch {
+          set('fallback');
+        }
+        return mode;
+      })()
+    : Promise.resolve(mode);
+
+  const call = async <K extends 'list' | 'capture' | 'recall' | 'update' | 'remove'>(name: K, ...args: Parameters<Backend[K]>): Promise<Awaited<ReturnType<Backend[K]>>> => {
+    await ready;
+    if (mode === 'live' && remote) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return await (remote[name] as any)(...args);
+      } catch (e) {
+        if (!isUnreachable(e)) throw e;
+        console.warn('[déjà vu] live backend unreachable, falling back to in-browser demo mode:', (e as Error).message);
+        set('fallback');
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (local[name] as any)(...args);
+  };
+
+  return {
+    get kind() {
+      return mode === 'live' ? 'supabase' : 'local';
+    },
+    get mode() {
+      return mode;
+    },
+    ready,
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    list: () => call('list'),
+    capture: (t, o) => call('capture', t, o),
+    recall: (q) => call('recall', q),
+    update: (id, p) => call('update', id, p),
+    remove: (id) => call('remove', id),
+    reset: () => local.reset!(),
+  };
+}
+
+export function getBackend(): AutoBackend {
   const url = import.meta.env?.VITE_SUPABASE_URL as string | undefined;
-  const key = import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const anonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined;
   const forceDemo = typeof location !== 'undefined' && /[?&]demo=1\b/.test(location.search);
-  if (url && key && !forceDemo) return createSupabaseBackend(url, key);
-  return createLocalBackend();
+  return createAutoBackend({ url, anonKey, forceDemo });
+}
+
+/** Recall UI: show the top match plus only matches within this similarity of it. */
+export const CLOSE_MATCH_WINDOW = 0.05;
+export function splitMatches<T extends { similarity: number }>(matches: T[], window = CLOSE_MATCH_WINDOW) {
+  if (!matches.length) return { shown: [] as T[], hidden: [] as T[] };
+  const top = matches[0].similarity;
+  return { shown: matches.filter((m) => m.similarity >= top - window), hidden: matches.filter((m) => m.similarity < top - window) };
 }

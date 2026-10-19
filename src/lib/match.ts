@@ -4,7 +4,7 @@ import { cosine, embed } from './embed';
 /** Hard cut-off for the local hashed embedder. Below this => graceful "no match". */
 export const LOCAL_MATCH_THRESHOLD = 0.25;
 /** Suggested thresholds for the neural embedders used server-side. */
-export const GTE_SMALL_MATCH_THRESHOLD = 0.82;
+export const GTE_SMALL_MATCH_THRESHOLD = 0.81;
 export const OPENAI_MATCH_THRESHOLD = 0.45;
 
 /** Estimated time a successful recall saves (hours). Conservative vs. the "4h/week" in the problem statement. */
