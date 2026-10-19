@@ -10,7 +10,7 @@ A voice-first memory for debugging — speak what you see while you debug; it re
 [![Live demo](https://img.shields.io/badge/live%20demo-open-8b5cf6?style=for-the-badge)](https://aneek22112007-tech.github.io/deja-vu/)
 [![App](https://img.shields.io/badge/app-try%20recall-34d399?style=for-the-badge)](https://aneek22112007-tech.github.io/deja-vu/#/app/recall)
 
-![Tests](https://img.shields.io/badge/tests-32%20passing-34d399)
+![Tests](https://img.shields.io/badge/tests-33%20passing-34d399)
 ![Backend](https://img.shields.io/badge/backend-Supabase%20pgvector%20%2B%20Groq-3ecf8e)
 ![Embeddings](https://img.shields.io/badge/embeddings-gte--small%20384d-a78bfa)
 ![3D](https://img.shields.io/badge/landing-three.js%20%2B%20R3F-black)

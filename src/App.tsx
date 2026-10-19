@@ -36,7 +36,12 @@ function Stat({ icon: Icon, label, value, tone = 'text-white' }: { icon: typeof 
 export default function App() {
   const backend = useMemo(() => getBackend(), []);
   const [mode, setMode] = useState<Mode>(backend.mode);
-  useEffect(() => backend.subscribe(setMode), [backend]);
+  useEffect(() => {
+    const off = backend.subscribe(setMode);
+    return () => {
+      off();
+    };
+  }, [backend]);
   const [tab, setTab] = useState<Tab>(readHash());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);

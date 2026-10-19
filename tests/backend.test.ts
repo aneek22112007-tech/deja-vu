@@ -57,6 +57,17 @@ describe('auto backend (live Supabase with in-browser fallback)', () => {
   });
 });
 
+describe('mode subscription', () => {
+  it('delivers the already-settled mode to late subscribers (probe finished before mount)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const b = createAutoBackend({ url: 'https://x.supabase.co', anonKey: 'anon', storage: mem() });
+    await b.ready;
+    const seen: string[] = [];
+    b.subscribe((m) => seen.push(m));
+    expect(seen).toEqual(['fallback']);
+  });
+});
+
 describe('splitMatches (top match + matches within 0.05)', () => {
   it('keeps only close matches visible', () => {
     const { shown, hidden } = splitMatches([{ similarity: 0.896 }, { similarity: 0.862 }, { similarity: 0.813 }]);

@@ -173,6 +173,7 @@ export type Mode = 'connecting' | 'live' | 'demo' | 'fallback';
 export interface AutoBackend extends Backend {
   readonly mode: Mode;
   ready: Promise<Mode>;
+  /** Calls fn with the current mode right away, then on every change. */
   subscribe(fn: (m: Mode) => void): () => void;
 }
 
@@ -236,6 +237,7 @@ export function createAutoBackend(opts: { url?: string; anonKey?: string; forceD
     ready,
     subscribe(fn) {
       listeners.add(fn);
+      fn(mode); // sync immediately: the probe may already have settled before the subscriber mounted
       return () => listeners.delete(fn);
     },
     list: () => call('list'),
